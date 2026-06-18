@@ -755,15 +755,15 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
       >
         {paletteView === 'categories' ? (
           /* ── Category list ── */
-          <div className="flex-1 flex flex-col p-3 gap-2 justify-center">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1 mb-1">Categorías</p>
+          <div className="flex-1 flex flex-col p-3 gap-2">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1 mb-1 shrink-0">Categorías</p>
             {(Object.keys(CATEGORIES) as (keyof typeof CATEGORIES)[]).map((key) => {
               const cat = CATEGORIES[key]
               return (
                 <button
                   key={key}
                   onClick={() => { setActiveCategory(key); setPaletteView('blocks') }}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-white touch-manipulation active:opacity-80 transition-opacity"
+                  className="flex-1 w-full flex items-center gap-3 px-4 rounded-xl text-white touch-manipulation active:opacity-80 transition-opacity"
                   style={{ background: cat.fill, boxShadow: `0 2px 0 ${cat.shadow}` }}
                 >
                   <span className="text-xl leading-none">{cat.emoji}</span>
@@ -1056,7 +1056,7 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
               exit={{ height: 0 }}
               className="border-t border-slate-800 bg-slate-950 overflow-hidden shrink-0"
             >
-              <div className="px-4 py-2.5 text-xs font-mono max-h-28 overflow-y-auto space-y-0.5">
+              <div className="pl-4 pr-16 py-2.5 text-xs font-mono max-h-28 overflow-y-auto space-y-0.5">
                 {executionLog.slice(-8).map((line, i) => (
                   <div key={i} className="text-emerald-400 leading-relaxed">
                     <span className="text-slate-600 mr-1.5 select-none">›</span>

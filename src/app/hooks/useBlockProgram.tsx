@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import {
   ProgramBlock, MotorForwardBlock, MotorBackwardBlock, MotorStopBlock,
   LedColorBlock, WaitBlock, RepeatBlock, ForeverBlock,
@@ -17,6 +17,13 @@ export function useBlockProgram() {
   const [currentBlockIndex, setCurrentBlockIndex] = useState<number | null>(null)
   const [executionLog, setExecutionLog] = useState<string[]>([])
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  // Keep sensor values in refs so executeBlock doesn't need them as deps
+  // (prevents stale-closure issues when BLE notifications arrive during execution)
+  const proximityRef = useRef(proximity)
+  const buttonPressedRef = useRef(buttonPressed)
+  useEffect(() => { proximityRef.current = proximity }, [proximity])
+  useEffect(() => { buttonPressedRef.current = buttonPressed }, [buttonPressed])
 
   const mapTree = (
     list: ProgramBlock[],
@@ -183,11 +190,12 @@ export function useBlockProgram() {
     setExecutionLog((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${message}`])
   }, [])
 
-  const delay = (ms: number, signal?: AbortSignal) =>
+  const delay = useCallback((ms: number, signal?: AbortSignal) =>
     new Promise<void>((resolve, reject) => {
+      if (signal?.aborted) { reject(new Error('Aborted')); return }
       const t = setTimeout(resolve, ms)
-      signal?.addEventListener('abort', () => { clearTimeout(t); reject(new Error('Aborted')) })
-    })
+      signal?.addEventListener('abort', () => { clearTimeout(t); reject(new Error('Aborted')) }, { once: true })
+    }), [])
 
   const executeBlock = useCallback(
     async (block: ProgramBlock, signal: AbortSignal): Promise<void> => {
@@ -243,7 +251,7 @@ export function useBlockProgram() {
           log('∞ Bucle infinito — usa Detener para parar')
           while (!signal.aborted) {
             for (const child of b.children) {
-              if (signal.aborted) break
+              if (signal.aborted) throw new Error('Aborted')
               await executeBlock(child, signal)
             }
           }
@@ -251,7 +259,7 @@ export function useBlockProgram() {
         }
         case 'if_distance': {
           const b = block as IfDistanceBlock
-          const dist = proximity?.value
+          const dist = proximityRef.current?.value
           if (dist != null) {
             const ok = b.condition === 'less_than' ? dist < b.value : dist > b.value
             log(`Distancia ${dist.toFixed(1)}cm ${b.condition === 'less_than' ? '<' : '>'} ${b.value} → ${ok ? 'SÍ' : 'NO'}`)
@@ -263,7 +271,7 @@ export function useBlockProgram() {
         }
         case 'if_tilt': {
           const b = block as IfTiltBlock
-          const tilt = proximity?.tilt
+          const tilt = proximityRef.current?.tilt
           const ok = tilt === b.direction
           log(`Inclinación ${tilt || 'ninguna'} = ${b.direction} → ${ok ? 'SÍ' : 'NO'}`)
           if (ok) for (const child of b.children) await executeBlock(child, signal)
@@ -271,7 +279,7 @@ export function useBlockProgram() {
         }
         case 'if_else_distance': {
           const b = block as IfElseDistanceBlock
-          const dist = proximity?.value
+          const dist = proximityRef.current?.value
           if (dist != null) {
             const ok = b.condition === 'less_than' ? dist < b.value : dist > b.value
             log(`Distancia ${dist.toFixed(1)}cm → ${ok ? 'SI (if)' : 'NO (sino)'}`)
@@ -282,7 +290,7 @@ export function useBlockProgram() {
         }
         case 'if_else_tilt': {
           const b = block as IfElseTiltBlock
-          const tilt = proximity?.tilt
+          const tilt = proximityRef.current?.tilt
           const ok = tilt === b.direction
           log(`Inclinación ${tilt || 'ninguna'} → ${ok ? 'SI (if)' : 'NO (sino)'}`)
           const branch = ok ? b.children : b.elseChildren
@@ -291,52 +299,66 @@ export function useBlockProgram() {
         }
         case 'if_button': {
           const b = block as IfButtonBlock
-          const ok = buttonPressed === true
+          const ok = buttonPressedRef.current === true
           log(`Botón verde ${ok ? 'presionado → SÍ' : 'suelto → NO'}`)
           if (ok) for (const child of b.children) await executeBlock(child, signal)
           break
         }
       }
     },
-    [sendPowerCommand, sendLedCommand, proximity, buttonPressed, log]
+    // Removed proximity/buttonPressed — read via refs to keep this callback stable
+    [sendPowerCommand, sendLedCommand, delay, log]
   )
 
   const runProgram = useCallback(async () => {
     if (!isConnected) { log('❌ Dispositivo no conectado'); return }
     if (blocks.length === 0) { log('❌ Sin bloques'); return }
 
+    // Abort any previous run that may still be unwinding
+    abortControllerRef.current?.abort()
+
     setStatus('running')
     setCurrentBlockIndex(0)
     setExecutionLog([])
     log('▶️ Iniciando...')
 
-    abortControllerRef.current = new AbortController()
-    const signal = abortControllerRef.current.signal
+    const ac = new AbortController()
+    abortControllerRef.current = ac
+    const signal = ac.signal
 
+    let finalStatus: ExecutionStatus = 'running'
     try {
       for (let i = 0; i < blocks.length; i++) {
         if (signal.aborted) { log('⏸️ Detenido'); break }
         setCurrentBlockIndex(i)
         await executeBlock(blocks[i], signal)
       }
-      if (!signal.aborted) { log('✅ Completado'); setStatus('completed') }
+      if (!signal.aborted) {
+        log('✅ Completado')
+        finalStatus = 'completed'
+        setStatus('completed')
+      }
     } catch (error) {
       if ((error as Error).message !== 'Aborted') {
         log(`❌ Error: ${(error as Error).message}`)
+        finalStatus = 'error'
         setStatus('error')
       } else {
+        log('⏸️ Detenido')
+        finalStatus = 'idle'
         setStatus('idle')
       }
     } finally {
       setCurrentBlockIndex(null)
-      if (status !== 'error') setTimeout(() => setStatus('idle'), 2000)
+      if (finalStatus === 'completed') setTimeout(() => setStatus('idle'), 2000)
     }
-  }, [blocks, isConnected, executeBlock, log, status])
+  }, [blocks, isConnected, executeBlock, log])
 
   const stopProgram = useCallback(() => {
     abortControllerRef.current?.abort()
     abortControllerRef.current = null
-    setStatus('idle')
+    // Don't update status here — the catch block in runProgram handles it
+    // to avoid a UI flash that could trigger accidental double-clicks
     setCurrentBlockIndex(null)
   }, [])
 
