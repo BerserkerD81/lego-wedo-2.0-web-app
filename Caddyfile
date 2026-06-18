@@ -1,0 +1,3 @@
+35-225-225-81.sslip.io {
+    reverse_proxy app:3001
+}

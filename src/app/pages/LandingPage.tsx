@@ -3,21 +3,7 @@ import {
   Bluetooth, Cpu, Lightbulb, Radio, Cloud, ArrowRight,
   Plug, Layers, Play, ChevronRight,
 } from 'lucide-react'
-
-function LegoBrick({ className = '' }: { className?: string }) {
-  return (
-    <div className={`relative ${className}`}>
-      <div className="absolute -top-2 left-2 right-6 flex gap-2">
-        <div className="w-4 h-4 rounded-full bg-amber-300" style={{ boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.15)' }} />
-        <div className="w-4 h-4 rounded-full bg-amber-300" style={{ boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.15)' }} />
-      </div>
-      <div
-        className="h-8 rounded-sm bg-amber-400"
-        style={{ boxShadow: 'inset 0 -3px 0 rgba(0,0,0,0.2)' }}
-      />
-    </div>
-  )
-}
+import { LegoBrick, BRICK_COLORS } from '../components/ui/LegoBrick'
 
 const FEATURES = [
   {
@@ -86,10 +72,7 @@ export function LandingPage() {
       <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
           <div className="flex items-center gap-2">
-            <div
-              className="w-6 h-6 rounded-md bg-amber-400"
-              style={{ boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.2)' }}
-            />
+            <LegoBrick color="yellow" className="w-9 h-7 drop-shadow-sm" />
             <span className="text-sm font-bold text-slate-800">LEGO WeDo 2.0</span>
           </div>
           <div className="flex items-center gap-2">
@@ -144,24 +127,19 @@ export function LandingPage() {
           </div>
 
           {/* LEGO brick illustration */}
-          <div className="shrink-0 flex flex-col gap-3 opacity-80">
-            {[
-              { cols: 4, colors: ['bg-amber-400', 'bg-blue-400', 'bg-red-400', 'bg-green-400'] },
-              { cols: 3, colors: ['bg-blue-400', 'bg-amber-400', 'bg-purple-400'] },
-              { cols: 4, colors: ['bg-red-400', 'bg-green-400', 'bg-amber-400', 'bg-blue-400'] },
-              { cols: 2, colors: ['bg-purple-400', 'bg-cyan-400'] },
-            ].map((row, ri) => (
+          <div className="shrink-0 flex flex-col gap-2.5 select-none" aria-hidden>
+            {(
+              [
+                ['yellow', 'blue',   'red',    'green' ],
+                ['blue',   'yellow', 'purple'          ],
+                ['red',    'green',  'yellow', 'cyan'  ],
+                ['purple', 'cyan',   'pink'            ],
+              ] as (keyof typeof BRICK_COLORS)[][]
+            ).map((row, ri) => (
               <div key={ri} className="flex gap-2">
-                {row.colors.map((color, ci) => (
-                  <div key={ci} className="relative w-14">
-                    <div className="absolute -top-2 left-1.5 right-1.5 flex gap-1 justify-center">
-                      <div className={`w-3.5 h-3.5 rounded-full ${color}`} style={{ filter: 'brightness(1.1)' }} />
-                      <div className={`w-3.5 h-3.5 rounded-full ${color}`} style={{ filter: 'brightness(1.1)' }} />
-                    </div>
-                    <div
-                      className={`h-7 rounded-sm ${color}`}
-                      style={{ boxShadow: 'inset 0 -3px 0 rgba(0,0,0,0.18)' }}
-                    />
+                {row.map((color, ci) => (
+                  <div key={ci} className="w-16 h-12">
+                    <LegoBrick color={color} className="w-full h-full drop-shadow-sm" />
                   </div>
                 ))}
               </div>

@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { Code2, Database } from 'lucide-react'
 import { ConnectedHubBadge } from './ConnectionModal'
+import { LegoBrick } from './ui/LegoBrick'
 
 export function NavBar() {
   const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -12,10 +13,7 @@ export function NavBar() {
     <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
       <div className="max-w-5xl mx-auto px-3 sm:px-4 flex items-center gap-3 h-11">
         <NavLink to="/" className="flex items-center gap-2 shrink-0">
-          <div
-            className="w-5 h-5 rounded-md bg-amber-400"
-            style={{ boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.2)' }}
-          />
+          <LegoBrick color="yellow" className="w-9 h-7 drop-shadow-sm" />
           <span className="text-sm font-semibold text-slate-800 hidden sm:block">LEGO WeDo 2.0</span>
         </NavLink>
 

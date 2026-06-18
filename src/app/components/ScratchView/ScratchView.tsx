@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect, ReactNode } from 're
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { nanoid } from 'nanoid'
-import { Play, Square, Trash2, X, Plus, Sparkles, Save, CheckSquare, CloudUpload, Wrench } from 'lucide-react'
+import { Play, Square, Trash2, X, Plus, Sparkles, Save, CheckSquare, CloudUpload, Wrench, ChevronLeft } from 'lucide-react'
 import {
   BLOCK_DEFINITIONS,
   BlockDefinition,
@@ -267,6 +267,7 @@ function ScratchBlock({
         className={outerCls}
         onPointerDown={onBlockPointerDown}
         data-block-id={block.id}
+        style={{ touchAction: 'none' }}
       >
         <BrickShell {...headerProps} clip={STATEMENT_CLIP}>{Inner}</BrickShell>
       </div>
@@ -278,6 +279,7 @@ function ScratchBlock({
       className={outerCls}
       onPointerDown={onBlockPointerDown}
       data-block-id={block.id}
+      style={{ touchAction: 'none' }}
     >
       <BrickShell {...headerProps} clip={HEADER_CLIP}>{Inner}</BrickShell>
 
@@ -611,6 +613,8 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [workspaceTab, setWorkspaceTab] = useState<'program' | 'testing'>('program')
+  const [showPalette, setShowPalette] = useState(false)
+  const [paletteView, setPaletteView] = useState<'categories' | 'blocks'>('categories')
 
   // Cleanup ref for pointermove/up listeners
   const cleanupRef = useRef<(() => void) | null>(null)
@@ -739,132 +743,105 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
         onSave={handleSaveSubmit}
       />
     )}
-    <div className="grid gap-2 sm:grid-cols-[192px_1fr] h-full min-h-0">
+    <div className="relative h-full min-h-0">
       {/* Ghost */}
       {freeDrag && <DragGhost state={freeDrag} />}
 
-      {/* Palette */}
-      <aside className="rounded-xl bg-white border border-slate-200 overflow-hidden flex flex-col h-full">
-        {/* Category navigation */}
-        <div className="p-2 border-b border-slate-100 shrink-0">
-          <div className="space-y-0.5">
+      {/* ── Palette overlay panel ─────────────────────────────────── */}
+      <aside
+        className={`absolute right-0 top-0 bottom-0 z-40 w-[200px] bg-white border-l border-y border-slate-200 rounded-l-2xl shadow-2xl flex flex-col transition-transform duration-200 ease-out ${
+          showPalette ? 'translate-x-0 pointer-events-auto' : 'translate-x-full pointer-events-none'
+        }`}
+      >
+        {paletteView === 'categories' ? (
+          /* ── Category list ── */
+          <div className="flex-1 flex flex-col p-3 gap-2 justify-center">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1 mb-1">Categorías</p>
             {(Object.keys(CATEGORIES) as (keyof typeof CATEGORIES)[]).map((key) => {
               const cat = CATEGORIES[key]
-              const active = activeCategory === key
               return (
                 <button
                   key={key}
-                  onClick={() => setActiveCategory(key)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all ${
-                    active ? 'text-white' : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                  style={active ? { background: cat.fill } : undefined}
+                  onClick={() => { setActiveCategory(key); setPaletteView('blocks') }}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-white touch-manipulation active:opacity-80 transition-opacity"
+                  style={{ background: cat.fill, boxShadow: `0 2px 0 ${cat.shadow}` }}
                 >
-                  <span className="text-base leading-none shrink-0">{cat.emoji}</span>
-                  <span className="text-xs font-medium">{cat.label}</span>
+                  <span className="text-xl leading-none">{cat.emoji}</span>
+                  <span className="text-sm font-semibold">{cat.label}</span>
                 </button>
               )
             })}
           </div>
-        </div>
-
-        {/* Selection mode banner */}
-        {(selectMode || isWrapMode) && (
-          <div className="px-3 py-2 bg-sky-50 border-b border-sky-100 shrink-0">
-            <div className="flex items-center justify-between text-xs text-sky-800">
-              <span className="font-medium">
-                {wrapSelectIds.size > 0
-                  ? `${wrapSelectIds.size} seleccionado${wrapSelectIds.size !== 1 ? 's' : ''}`
-                  : 'Toca para seleccionar'}
-              </span>
+        ) : (
+          /* ── Block list for selected category ── */
+          <>
+            {/* Header with back button */}
+            <div className="flex items-center gap-2 px-2 py-2.5 border-b border-slate-100 shrink-0">
               <button
-                onClick={exitSelectMode}
-                className="underline hover:no-underline text-sky-600"
+                onClick={() => setPaletteView('categories')}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-slate-500 hover:bg-slate-100 touch-manipulation transition-colors"
               >
-                salir
+                <ChevronLeft className="w-4 h-4" />
+                <span className="text-xs">Atrás</span>
               </button>
+              <span className="text-xs font-semibold" style={{ color: CATEGORIES[activeCategory].fill }}>
+                {CATEGORIES[activeCategory].emoji} {CATEGORIES[activeCategory].label}
+              </span>
             </div>
-            {wrapSelectIds.size > 0 && (
-              <p className="text-xs text-sky-600 mt-0.5 opacity-80">
-                Elige un contenedor para agrupar
-              </p>
-            )}
-          </div>
-        )}
 
-        {selectedContainerId && !isWrapMode && !selectMode && (
-          <div className="px-3 py-2 bg-sky-50 border-b border-sky-100 text-xs text-sky-700 flex items-center justify-between shrink-0">
-            <span>Añadiendo dentro del bloque</span>
-            <button onClick={() => setSelectedContainerId(null)} className="underline hover:no-underline">salir</button>
-          </div>
-        )}
-
-        {/* Block list — scrollable */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          <AnimatePresence mode="popLayout">
-            {filteredDefs.map((def) => (
-              <motion.div key={def.type} layout initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.15 }}>
-                <PaletteBlock
-                  definition={def}
-                  onAdd={handleAdd}
-                  onDragOverId={setDragOverId}
-                  onDropInZone={(d, parentId) => {
-                    if (parentId && (parentId as string).startsWith('__before__')) {
-                      const newBlock = newBlockFromDef(d)
-                      addBlock(newBlock, null)
-                      insertBlockBefore([newBlock.id], (parentId as string).slice('__before__'.length))
-                    } else {
-                      addBlock(newBlockFromDef(d), parentId)
-                    }
-                  }}
-                />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-
-        {/* Actions */}
-        <div className="p-2 border-t border-slate-100 space-y-0.5 shrink-0">
-          <button
-            onClick={handleSave}
-            disabled={!blocks.length}
-            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs transition disabled:opacity-40 ${
-              saveSuccess
-                ? 'text-emerald-700 bg-emerald-50'
-                : 'text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            {saveSuccess
-              ? <><CloudUpload className="w-3.5 h-3.5 shrink-0" /> ¡Guardado en la nube!</>
-              : <><Save className="w-3.5 h-3.5 shrink-0" /> Guardar en nube</>}
-          </button>
-
-          <button
-            onClick={() => setShowExamples(v => !v)}
-            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs transition ${
-              showExamples ? 'text-amber-700 bg-amber-50' : 'text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 shrink-0" /> Ejemplos
-          </button>
-          {showExamples && (
-            <div className="pl-9 space-y-0.5">
-              {Object.keys(examples).map(name => (
-                <button
-                  key={name}
-                  onClick={() => { loadBlocks(examples[name as keyof typeof examples]); setShowExamples(false) }}
-                  className="w-full text-left text-xs text-slate-500 hover:text-slate-900 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition"
-                >
-                  · {name}
-                </button>
-              ))}
+            {/* Block list */}
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              <AnimatePresence mode="popLayout">
+                {filteredDefs.map((def) => (
+                  <motion.div key={def.type} layout initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 8 }} transition={{ duration: 0.12 }}>
+                    <PaletteBlock
+                      definition={def}
+                      onAdd={(d) => { handleAdd(d); setShowPalette(false); setPaletteView('categories') }}
+                      onDragOverId={setDragOverId}
+                      onDropInZone={(d, parentId) => {
+                        setShowPalette(false); setPaletteView('categories')
+                        if (parentId && (parentId as string).startsWith('__before__')) {
+                          const newBlock = newBlockFromDef(d)
+                          addBlock(newBlock, null)
+                          insertBlockBefore([newBlock.id], (parentId as string).slice('__before__'.length))
+                        } else {
+                          addBlock(newBlockFromDef(d), parentId)
+                        }
+                      }}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
-          )}
-        </div>
+          </>
+        )}
       </aside>
 
-      {/* Workspace */}
-      <section className="rounded-xl bg-white border border-slate-200 overflow-hidden flex flex-col h-full min-h-0">
+      {/* Backdrop — closes palette on tap */}
+      {showPalette && (
+        <div
+          className="absolute inset-0 z-30 bg-black/20 rounded-xl"
+          onClick={() => { setShowPalette(false); setPaletteView('categories') }}
+        />
+      )}
+
+      {/* ── Floating palette toggle button (bottom-right) ─────────── */}
+      <motion.button
+        whileTap={{ scale: 0.9 }}
+        onClick={() => {
+          if (showPalette) { setShowPalette(false); setPaletteView('categories') }
+          else setShowPalette(true)
+        }}
+        title="Bloques"
+        className={`absolute bottom-3 right-3 z-50 w-12 h-12 rounded-full shadow-lg flex items-center justify-center touch-manipulation transition-colors ${
+          showPalette ? 'bg-slate-700 text-white' : 'bg-amber-400 text-slate-900'
+        }`}
+      >
+        {showPalette ? <X className="w-5 h-5" /> : <span className="text-xl leading-none">🧩</span>}
+      </motion.button>
+
+      {/* ── Workspace ─────────────────────────────────────────────── */}
+      <section className="h-full w-full rounded-xl bg-white border border-slate-200 overflow-hidden flex flex-col min-h-0">
         {/* Toolbar */}
         <header className="flex items-center justify-between px-3 py-2 border-b border-slate-100 shrink-0 gap-2">
           {/* Tabs */}
@@ -900,7 +877,6 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
                 Testing
               </button>
             )}
-            {/* Execution status (program tab only) */}
             {workspaceTab === 'program' && status === 'running' && (
               <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium ml-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -915,16 +891,54 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
             )}
           </div>
 
-          {/* Actions (only on program tab) */}
+          {/* Actions (program tab only) */}
           {workspaceTab === 'program' && (
             <div className="flex items-center gap-1 shrink-0">
+              {/* Examples dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowExamples(v => !v)}
+                  title="Ejemplos"
+                  className={`rounded-lg p-1.5 flex items-center gap-1 transition touch-manipulation ${
+                    showExamples ? 'bg-amber-100 text-amber-700' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span className="hidden sm:inline text-xs">Ejemplos</span>
+                </button>
+                {showExamples && (
+                  <div className="absolute right-0 top-full mt-1 bg-white rounded-xl border border-slate-200 shadow-lg z-20 min-w-[130px] py-1">
+                    {Object.keys(examples).map(name => (
+                      <button
+                        key={name}
+                        onClick={() => { loadBlocks(examples[name as keyof typeof examples]); setShowExamples(false) }}
+                        className="w-full text-left text-xs text-slate-600 hover:text-slate-900 px-3 py-2 hover:bg-slate-50 transition"
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Save */}
+              <button
+                onClick={handleSave}
+                disabled={!blocks.length}
+                title="Guardar en nube"
+                className={`rounded-lg p-1.5 flex items-center gap-1 transition touch-manipulation disabled:opacity-30 ${
+                  saveSuccess ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                }`}
+              >
+                {saveSuccess ? <CloudUpload className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+              </button>
+
+              {/* Select mode */}
               <button
                 onClick={() => { setSelectMode(v => !v); if (selectMode) setWrapSelectIds(new Set()) }}
                 title="Modo selección"
-                className={`rounded-lg p-1.5 flex items-center gap-1 transition ${
-                  selectMode || isWrapMode
-                    ? 'bg-sky-100 text-sky-700'
-                    : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                className={`rounded-lg p-1.5 flex items-center gap-1 transition touch-manipulation ${
+                  selectMode || isWrapMode ? 'bg-sky-100 text-sky-700' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
                 }`}
               >
                 <CheckSquare className="w-4 h-4" />
@@ -932,19 +946,23 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
                   <span className="text-xs font-medium">{wrapSelectIds.size}</span>
                 )}
               </button>
+
+              {/* Clear */}
               <button
                 onClick={clearBlocks}
                 disabled={blocks.length === 0 || isRunning}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-30 transition"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-30 transition touch-manipulation"
                 title="Limpiar programa"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
+
+              {/* Run / Stop */}
               <motion.button
                 whileTap={{ scale: 0.93 }}
                 onClick={isRunning ? stopProgram : runProgram}
                 disabled={!isConnected || (blocks.length === 0 && !isRunning)}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium text-white flex items-center gap-1.5 disabled:opacity-40 transition shadow-sm ${
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium text-white flex items-center gap-1.5 disabled:opacity-40 transition shadow-sm touch-manipulation ${
                   isRunning
                     ? 'bg-red-500 hover:bg-red-600 shadow-red-200'
                     : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200'
@@ -965,74 +983,71 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
         )}
 
         {/* Canvas (program tab) */}
-        {workspaceTab === 'program' && <div
-          className="flex-1 overflow-y-auto p-4"
-          style={{
-            backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(15,23,42,0.04) 1px, transparent 0)',
-            backgroundSize: '20px 20px',
-          }}
-          onClick={() => { setSelectedContainerId(null); if (!selectMode) setWrapSelectIds(new Set()) }}
-        >
-          {blocks.length === 0 ? (
-            <div
-              data-drop-zone="__top__"
-              onDragOver={(e) => { e.preventDefault(); setDragOverId('__top__') }}
-              onDragLeave={() => setDragOverId(null)}
-              onDrop={(e) => {
-                e.preventDefault()
-                const pt = e.dataTransfer.getData('application/palette-block')
-                if (pt) { const d = BLOCK_DEFINITIONS.find(x => x.type === pt); if (d) addBlock(newBlockFromDef(d), null); setDragOverId(null); return }
-                const ids = JSON.parse(e.dataTransfer.getData('application/json') || '[]') as string[]
-                if (ids.length) moveBlockTo(ids, null)
-                setDragOverId(null)
-              }}
-              className={`flex flex-col items-center justify-center min-h-[320px] h-full rounded-2xl border-2 border-dashed transition-all ${
-                dragOverId === '__top__'
-                  ? 'border-sky-400 bg-sky-50/70 text-sky-600'
-                  : 'border-slate-200 text-slate-400'
-              }`}
-            >
-              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 text-3xl transition-all ${
-                dragOverId === '__top__' ? 'bg-sky-100' : 'bg-slate-100'
-              }`}>
-                {dragOverId === '__top__' ? '⬇' : '🧩'}
+        {workspaceTab === 'program' && (
+          <div
+            className="flex-1 overflow-y-auto p-4"
+            style={{
+              backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(15,23,42,0.04) 1px, transparent 0)',
+              backgroundSize: '20px 20px',
+            }}
+            onClick={() => { setSelectedContainerId(null); if (!selectMode) setWrapSelectIds(new Set()) }}
+          >
+            {blocks.length === 0 ? (
+              <div
+                data-drop-zone="__top__"
+                onDragOver={(e) => { e.preventDefault(); setDragOverId('__top__') }}
+                onDragLeave={() => setDragOverId(null)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  const pt = e.dataTransfer.getData('application/palette-block')
+                  if (pt) { const d = BLOCK_DEFINITIONS.find(x => x.type === pt); if (d) addBlock(newBlockFromDef(d), null); setDragOverId(null); return }
+                  const ids = JSON.parse(e.dataTransfer.getData('application/json') || '[]') as string[]
+                  if (ids.length) moveBlockTo(ids, null)
+                  setDragOverId(null)
+                }}
+                className={`flex flex-col items-center justify-center min-h-[280px] h-full rounded-2xl border-2 border-dashed transition-all ${
+                  dragOverId === '__top__' ? 'border-sky-400 bg-sky-50/70 text-sky-600' : 'border-slate-200 text-slate-400'
+                }`}
+              >
+                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 text-3xl transition-all ${
+                  dragOverId === '__top__' ? 'bg-sky-100' : 'bg-slate-100'
+                }`}>
+                  {dragOverId === '__top__' ? '⬇' : '🧩'}
+                </div>
+                <p className="text-sm font-medium text-center px-4">
+                  {dragOverId === '__top__' ? 'Soltar aquí' : 'Pulsa 🧩 para añadir bloques'}
+                </p>
               </div>
-              <p className="text-sm font-medium">
-                {dragOverId === '__top__' ? 'Soltar aquí' : 'Arrastra bloques al área'}
-              </p>
-              <p className="text-xs mt-1 opacity-60 hidden sm:block">
-                {dragOverId !== '__top__' && 'o usa los Ejemplos de la paleta'}
-              </p>
-            </div>
-          ) : (
-            <div className="max-w-md mx-auto pt-1" onClick={(e) => e.stopPropagation()}>
-              <BlockList
-                list={blocks}
-                parentKey={null}
-                {...sharedListProps}
-              />
-              <AnimatePresence>
-                {freeDrag && (
-                  <motion.div
-                    initial={{ opacity: 0, scaleY: 0.5 }}
-                    animate={{ opacity: 1, scaleY: 1 }}
-                    exit={{ opacity: 0, scaleY: 0.5 }}
-                    data-drop-zone="__top__end"
-                    className={`mt-3 h-10 rounded-xl border-2 border-dashed flex items-center justify-center text-xs transition-all ${
-                      dragOverId === '__top__end'
-                        ? 'border-sky-400 bg-sky-100/80 text-sky-700'
-                        : 'border-slate-300 text-slate-400'
-                    }`}
-                  >
-                    {dragOverId === '__top__end' ? '⬇ Soltar aquí' : '+ Soltar al final'}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
-        </div>}
+            ) : (
+              <div className="max-w-md mx-auto pt-1" onClick={(e) => e.stopPropagation()}>
+                <BlockList
+                  list={blocks}
+                  parentKey={null}
+                  {...sharedListProps}
+                />
+                <AnimatePresence>
+                  {freeDrag && (
+                    <motion.div
+                      initial={{ opacity: 0, scaleY: 0.5 }}
+                      animate={{ opacity: 1, scaleY: 1 }}
+                      exit={{ opacity: 0, scaleY: 0.5 }}
+                      data-drop-zone="__top__end"
+                      className={`mt-3 h-10 rounded-xl border-2 border-dashed flex items-center justify-center text-xs transition-all ${
+                        dragOverId === '__top__end'
+                          ? 'border-sky-400 bg-sky-100/80 text-sky-700'
+                          : 'border-slate-300 text-slate-400'
+                      }`}
+                    >
+                      {dragOverId === '__top__end' ? '⬇ Soltar aquí' : '+ Soltar al final'}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+        )}
 
-        {/* Execution log — terminal style (program tab only) */}
+        {/* Execution log */}
         <AnimatePresence>
           {workspaceTab === 'program' && executionLog.length > 0 && (
             <motion.div

@@ -1,16 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" fill="none">
-  <rect width="192" height="192" rx="36" fill="#F59E0B"/>
-  <!-- Studs on top -->
-  <circle cx="48" cy="54" r="18" fill="#D97706"/>
-  <circle cx="96" cy="54" r="18" fill="#D97706"/>
-  <circle cx="144" cy="54" r="18" fill="#D97706"/>
-  <circle cx="48" cy="54" r="11" fill="#F59E0B"/>
-  <circle cx="96" cy="54" r="11" fill="#F59E0B"/>
-  <circle cx="144" cy="54" r="11" fill="#F59E0B"/>
-  <!-- Brick body -->
-  <rect x="14" y="66" width="164" height="112" rx="14" fill="#D97706"/>
-  <!-- Green hub button -->
-  <circle cx="96" cy="126" r="32" fill="#10B981"/>
-  <circle cx="96" cy="126" r="23" fill="#059669"/>
-  <text x="96" y="135" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="22" font-weight="900" fill="white">W</text>
+  <!-- Rounded square background — warm white/cream -->
+  <rect width="192" height="192" rx="40" fill="#FFFBEB"/>
+
+  <!-- Scale up the LegoBrick to fill the icon -->
+  <!-- viewBox maps 64×46 → fits nicely in 192×192 with padding -->
+  <!-- We scale ~2.6x and center: offset x=16, y=50 -->
+  <g transform="translate(16, 46) scale(2.5)">
+
+    <!-- Body depth / shadow edge -->
+    <rect x="2" y="23" width="60" height="23" rx="6" fill="#D97706"/>
+    <!-- Main body -->
+    <rect x="0" y="18" width="60" height="24" rx="6" fill="#FCD34D"/>
+    <!-- Top highlight -->
+    <rect x="0" y="18" width="60" height="8" rx="6" fill="rgba(255,255,255,0.22)"/>
+
+    <!-- Left stud — cylinder side -->
+    <rect x="9" y="10" width="16" height="11" fill="#D97706"/>
+    <!-- Left stud — top ellipse -->
+    <ellipse cx="17" cy="10" rx="8" ry="5" fill="#FCD34D"/>
+    <!-- Left stud — highlight arc -->
+    <ellipse cx="15" cy="8.5" rx="4.5" ry="2.5" fill="rgba(255,255,255,0.32)"/>
+    <!-- Left stud — hollow center -->
+    <circle cx="17" cy="10" r="2.8" fill="#D97706"/>
+
+    <!-- Right stud — cylinder side -->
+    <rect x="35" y="10" width="16" height="11" fill="#D97706"/>
+    <!-- Right stud — top ellipse -->
+    <ellipse cx="43" cy="10" rx="8" ry="5" fill="#FCD34D"/>
+    <!-- Right stud — highlight arc -->
+    <ellipse cx="41" cy="8.5" rx="4.5" ry="2.5" fill="rgba(255,255,255,0.32)"/>
+    <!-- Right stud — hollow center -->
+    <circle cx="43" cy="10" r="2.8" fill="#D97706"/>
+  </g>
 </svg>
