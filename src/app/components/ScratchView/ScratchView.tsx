@@ -538,19 +538,23 @@ function PaletteBlock({
 
   return (
     <motion.div
-      draggable
-      onDragStart={handleDragStart}
-      onPointerDown={handlePointerDown}
       whileHover={{ y: -1 }}
       whileTap={{ scale: 0.96 }}
-      onClick={() => onAdd(definition)}
-      className="relative w-full cursor-grab active:cursor-grabbing touch-none select-none"
+      className="relative w-full"
     >
-      <BrickShell fill={cat.fill} shadow={cat.shadow} clip={STATEMENT_CLIP} height={38} marginTop={0}>
-        <span className="text-sm">{definition.icon}</span>
-        <span className="text-xs flex-1 truncate">{definition.label}</span>
-        <Plus className="w-3 h-3 opacity-80 shrink-0" />
-      </BrickShell>
+      <div
+        draggable
+        onDragStart={handleDragStart}
+        onPointerDown={handlePointerDown}
+        onClick={() => onAdd(definition)}
+        className="w-full cursor-grab active:cursor-grabbing touch-none select-none"
+      >
+        <BrickShell fill={cat.fill} shadow={cat.shadow} clip={STATEMENT_CLIP} height={38} marginTop={0}>
+          <span className="text-sm">{definition.icon}</span>
+          <span className="text-xs flex-1 truncate">{definition.label}</span>
+          <Plus className="w-3 h-3 opacity-80 shrink-0" />
+        </BrickShell>
+      </div>
     </motion.div>
   )
 }
