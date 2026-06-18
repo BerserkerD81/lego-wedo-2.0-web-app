@@ -1047,26 +1047,6 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
           </div>
         )}
 
-        {/* Execution log */}
-        <AnimatePresence>
-          {workspaceTab === 'program' && executionLog.length > 0 && (
-            <motion.div
-              initial={{ height: 0 }}
-              animate={{ height: 'auto' }}
-              exit={{ height: 0 }}
-              className="border-t border-slate-800 bg-slate-950 overflow-hidden shrink-0"
-            >
-              <div className="pl-4 pr-16 py-2.5 text-xs font-mono max-h-28 overflow-y-auto space-y-0.5">
-                {executionLog.slice(-8).map((line, i) => (
-                  <div key={i} className="text-emerald-400 leading-relaxed">
-                    <span className="text-slate-600 mr-1.5 select-none">›</span>
-                    {line}
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </section>
     </div>
     </>
