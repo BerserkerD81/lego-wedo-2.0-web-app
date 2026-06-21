@@ -3,6 +3,7 @@ import { LedColor } from '../services/bluetoothService'
 export type BlockType =
   | 'motor_forward'
   | 'motor_backward'
+  | 'motor_on'
   | 'motor_stop'
   | 'led_color'
   | 'wait'
@@ -31,6 +32,13 @@ export interface MotorBackwardBlock extends BaseBlock {
   port: 1 | 2
   power: number
   duration: number
+}
+
+export interface MotorOnBlock extends BaseBlock {
+  type: 'motor_on'
+  port: 1 | 2
+  power: number
+  direction: 'forward' | 'backward'
 }
 
 export interface MotorStopBlock extends BaseBlock {
@@ -95,6 +103,7 @@ export interface IfButtonBlock extends BaseBlock {
 export type ProgramBlock =
   | MotorForwardBlock
   | MotorBackwardBlock
+  | MotorOnBlock
   | MotorStopBlock
   | LedColorBlock
   | WaitBlock
@@ -144,6 +153,14 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     defaultValues: { port: 1, power: 50, duration: 1000 },
   },
   {
+    type: 'motor_on',
+    label: 'Motor encender',
+    color: 'bg-blue-400',
+    icon: '▶',
+    category: 'motion',
+    defaultValues: { port: 1, power: 50, direction: 'forward' },
+  },
+  {
     type: 'motor_stop',
     label: 'Detener motor',
     color: 'bg-red-500',
@@ -189,7 +206,7 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     color: 'bg-cyan-500',
     icon: '📏',
     category: 'sensing',
-    defaultValues: { condition: 'less_than', value: 20, children: [] },
+    defaultValues: { condition: 'less_than', value: 5, children: [] },
   },
   {
     type: 'if_tilt',
@@ -205,7 +222,7 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     color: 'bg-cyan-600',
     icon: '📏',
     category: 'sensing',
-    defaultValues: { condition: 'less_than', value: 20, children: [], elseChildren: [] },
+    defaultValues: { condition: 'less_than', value: 5, children: [], elseChildren: [] },
   },
   {
     type: 'if_else_tilt',

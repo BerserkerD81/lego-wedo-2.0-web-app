@@ -54,8 +54,22 @@ function BlockParams({ block, onUpdate }: { block: ProgramBlock; onUpdate: (u: P
             <option value={1}>A</option><option value={2}>B</option>
           </select>
           <input type="number" value={block.power} onChange={(e) => onUpdate({ power: Number(e.target.value) })} className={`${cls} w-12`} min={0} max={100} />
-          <input type="number" value={block.duration} onChange={(e) => onUpdate({ duration: Number(e.target.value) })} className={`${cls} w-16`} min={0} />
-          <span className="text-white/90 text-xs">ms</span>
+          <input type="number" value={block.duration / 1000} onChange={(e) => onUpdate({ duration: Number(e.target.value) * 1000 })} className={`${cls} w-14`} min={0} step={0.5} />
+          <span className="text-white/90 text-xs">s</span>
+        </div>
+      )
+    case 'motor_on':
+      return (
+        <div className="flex items-center gap-1 flex-wrap" onClick={stop}>
+          <select value={block.port} onChange={(e) => onUpdate({ port: Number(e.target.value) as 1 | 2 })} className={cls}>
+            <option value={1}>A</option><option value={2}>B</option>
+          </select>
+          <select value={block.direction} onChange={(e) => onUpdate({ direction: e.target.value as 'forward' | 'backward' })} className={cls}>
+            <option value="forward">adelante</option>
+            <option value="backward">atrás</option>
+          </select>
+          <input type="number" value={block.power} onChange={(e) => onUpdate({ power: Number(e.target.value) })} className={`${cls} w-12`} min={0} max={100} />
+          <span className="text-white/90 text-xs">%</span>
         </div>
       )
     case 'motor_stop':
@@ -75,8 +89,8 @@ function BlockParams({ block, onUpdate }: { block: ProgramBlock; onUpdate: (u: P
     case 'wait':
       return (
         <div className="flex items-center gap-1" onClick={stop}>
-          <input type="number" value={block.duration} onChange={(e) => onUpdate({ duration: Number(e.target.value) })} className={`${cls} w-16`} min={0} />
-          <span className="text-white/90 text-xs">ms</span>
+          <input type="number" value={block.duration / 1000} onChange={(e) => onUpdate({ duration: Number(e.target.value) * 1000 })} className={`${cls} w-14`} min={0} step={0.5} />
+          <span className="text-white/90 text-xs">s</span>
         </div>
       )
     case 'repeat':
@@ -97,7 +111,7 @@ function BlockParams({ block, onUpdate }: { block: ProgramBlock; onUpdate: (u: P
             <option value="less_than">&lt;</option>
             <option value="greater_than">&gt;</option>
           </select>
-          <input type="number" value={block.value} onChange={(e) => onUpdate({ value: Number(e.target.value) })} className={`${cls} w-12`} min={0} />
+          <input type="number" value={block.value} onChange={(e) => onUpdate({ value: Number(e.target.value) })} className={`${cls} w-12`} min={0} max={10} />
         </div>
       )
     case 'if_tilt':
@@ -415,9 +429,13 @@ function BlockList({
             if (isRunning) return
             if ((e.target as HTMLElement).closest('input, select, button')) return
             if ((e.shiftKey || selectMode) && depth === 0) {
-              e.preventDefault(); e.stopPropagation()
-              onToggleWrap(block.id)
-              return
+              if (!wrapSelectIds.has(block.id)) {
+                // block not yet selected → select it, don't drag
+                e.preventDefault(); e.stopPropagation()
+                onToggleWrap(block.id)
+                return
+              }
+              // block already selected → fall through to drag all selected blocks
             }
             e.stopPropagation()
 
@@ -560,7 +578,15 @@ function PaletteBlock({
       const els = document.elementsFromPoint(ev.clientX, ev.clientY)
       const zone = els.find(el => (el as HTMLElement).dataset.dropZone) as HTMLElement | undefined
       const targetId = zone?.dataset.dropZone
-      if (targetId) onDropInZone(definition, targetId === '__top__' || targetId === '__top__end' ? null : targetId)
+      if (targetId) {
+        let pid: string | null = null
+        if (targetId !== '__top__' && targetId !== '__top__end') {
+          pid = targetId.endsWith('__end')
+            ? targetId.slice(0, targetId.lastIndexOf('__end'))
+            : targetId
+        }
+        onDropInZone(definition, pid)
+      }
     }
     document.addEventListener('pointermove', onMove)
     document.addEventListener('pointerup', onUp)
@@ -688,8 +714,11 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
         if (zoneId.startsWith('__before__')) {
           const beforeId = zoneId.slice('__before__'.length)
           insertBlockBefore(ids, beforeId)
-        } else if (zoneId === '__top__' || zoneId.endsWith('__end')) {
+        } else if (zoneId === '__top__' || zoneId === '__top__end') {
           moveBlockTo(ids, null)
+        } else if (zoneId.endsWith('__end')) {
+          // end-of-container zone → add to that container (strip '__end' suffix)
+          moveBlockTo(ids, zoneId.slice(0, zoneId.lastIndexOf('__end')))
         } else {
           moveBlockTo(ids, zoneId)
         }

@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import {
-  ProgramBlock, MotorForwardBlock, MotorBackwardBlock, MotorStopBlock,
+  ProgramBlock, MotorForwardBlock, MotorBackwardBlock, MotorOnBlock, MotorStopBlock,
   LedColorBlock, WaitBlock, RepeatBlock, ForeverBlock,
   IfDistanceBlock, IfTiltBlock, IfElseDistanceBlock, IfElseTiltBlock, IfButtonBlock,
   isContainerBlock, isIfElseBlock,
@@ -216,6 +216,12 @@ export function useBlockProgram() {
           await sendPowerCommand(b.power, 'backward', b.port)
           await delay(b.duration, signal)
           await sendPowerCommand(0, 'forward', b.port)
+          break
+        }
+        case 'motor_on': {
+          const b = block as MotorOnBlock
+          log(`Motor ${b.port === 1 ? 'A' : 'B'} encendido ${b.direction === 'forward' ? 'adelante' : 'atrás'} a ${b.power}%`)
+          await sendPowerCommand(b.power, b.direction, b.port)
           break
         }
         case 'motor_stop': {
