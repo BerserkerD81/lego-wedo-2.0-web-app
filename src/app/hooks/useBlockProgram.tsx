@@ -254,6 +254,9 @@ export function useBlockProgram() {
               if (signal.aborted) throw new Error('Aborted')
               await executeBlock(child, signal)
             }
+            // yield to the macro-task queue so BLE sensor notifications can
+            // update proximityRef/buttonPressedRef before the next iteration
+            await delay(0, signal)
           }
           throw new Error('Aborted')
         }

@@ -323,6 +323,7 @@ interface BlockListProps {
   selectMode: boolean
   dragCtx: DragCtx
   branchSuffix?: string
+  onEnterSelectMode?: (blockId: string) => void
 }
 
 function BlockList({
@@ -330,7 +331,7 @@ function BlockList({
   selectedContainerId, setSelectedContainerId,
   removeBlock, updateBlock, isRunning,
   wrapSelectIds, onToggleWrap, selectMode,
-  dragCtx, branchSuffix = '',
+  dragCtx, branchSuffix = '', onEnterSelectMode,
 }: BlockListProps) {
   const containerKey = parentKey != null ? parentKey + branchSuffix : null
   const isDragActive = dragCtx.freeDrag !== null
@@ -379,17 +380,22 @@ function BlockList({
   }
 
   return (
-    <div className="relative">
-      {/* Highlight when dragging over this container */}
-      {isDragActive && parentBlock && (
-        <div
-          {...dzHandlers(containerDropZoneId)}
-          className={`absolute inset-0 rounded-md border-2 border-dashed pointer-events-none z-10 transition-all ${
-            isDropTarget(containerDropZoneId) ? 'border-sky-400 bg-sky-100/30' : 'border-transparent'
-          }`}
-        />
-      )}
-
+    <div
+      className={`relative transition-colors ${isDragActive && parentBlock && isDropTarget(containerDropZoneId) ? 'bg-sky-100/40 rounded' : ''}`}
+      data-drop-zone={parentBlock ? containerDropZoneId : undefined}
+      onDragOver={parentBlock ? (e: React.DragEvent) => { e.preventDefault() } : undefined}
+      onDrop={parentBlock ? (e: React.DragEvent) => {
+        e.preventDefault(); e.stopPropagation()
+        const paletteType = e.dataTransfer.getData('application/palette-block')
+        if (paletteType) {
+          const def = BLOCK_DEFINITIONS.find(d => d.type === paletteType)
+          if (def) dragCtx.addBlock({ id: nanoid(), type: def.type, ...def.defaultValues } as ProgramBlock, containerDropZoneId)
+          return
+        }
+        const ids = JSON.parse(e.dataTransfer.getData('application/json') || '[]') as string[]
+        if (ids.length) dragCtx.moveBlockTo(ids, containerDropZoneId)
+      } : undefined}
+    >
       {/* Insert-before zone at the top */}
       {isDragActive && (
         <div
@@ -414,6 +420,27 @@ function BlockList({
               return
             }
             e.stopPropagation()
+
+            // Long-press (600 ms, touch only, top-level only) → enter multi-select mode
+            if (e.pointerType === 'touch' && depth === 0 && !selectMode && onEnterSelectMode) {
+              const ox = e.clientX, oy = e.clientY
+              let lpTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+                lpTimer = null
+                onEnterSelectMode(block.id)
+              }, 600)
+              const cancelLp = (ev: PointerEvent) => {
+                if (lpTimer && Math.hypot(ev.clientX - ox, ev.clientY - oy) > 8) {
+                  clearTimeout(lpTimer); lpTimer = null
+                  document.removeEventListener('pointermove', cancelLp)
+                }
+              }
+              document.addEventListener('pointermove', cancelLp)
+              document.addEventListener('pointerup', () => {
+                if (lpTimer) { clearTimeout(lpTimer); lpTimer = null }
+                document.removeEventListener('pointermove', cancelLp)
+              }, { once: true })
+            }
+
             const def = BLOCK_DEFINITIONS.find(d => d.type === block.type)!
             const cat = CATEGORIES[def.category]
             const ids = wrapSelectIds.has(block.id) ? [...wrapSelectIds] : [block.id]
@@ -423,6 +450,7 @@ function BlockList({
           const childProps: Omit<BlockListProps, 'list' | 'parentKey' | 'parentBlock' | 'branchSuffix'> = {
             depth: depth + 1, activeIndex, selectedContainerId, setSelectedContainerId,
             removeBlock, updateBlock, isRunning, wrapSelectIds, onToggleWrap, selectMode, dragCtx,
+            onEnterSelectMode,
           }
 
           const children = isContainerBlock(block) ? (block as ContainerLike).children : []
@@ -615,6 +643,18 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
   const [workspaceTab, setWorkspaceTab] = useState<'program' | 'testing'>('program')
   const [showPalette, setShowPalette] = useState(false)
   const [paletteView, setPaletteView] = useState<'categories' | 'blocks'>('categories')
+  const [zoom, setZoom] = useState(1.0)
+
+  const zoomRef = useRef(1.0)
+  const pinchRef = useRef<{ dist: number; startZoom: number } | null>(null)
+  const canvasRef = useRef<HTMLDivElement>(null)
+
+  const updateZoom = (next: number) => { zoomRef.current = next; setZoom(next) }
+
+  const handleEnterSelectMode = useCallback((blockId: string) => {
+    setSelectMode(true)
+    setWrapSelectIds(new Set([blockId]))
+  }, [])
 
   // Cleanup ref for pointermove/up listeners
   const cleanupRef = useRef<(() => void) | null>(null)
@@ -721,6 +761,39 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
 
   const examples = makeExamples()
 
+  // Non-passive wheel (ctrl+scroll to zoom) and touchmove (pinch to zoom)
+  useEffect(() => {
+    if (workspaceTab !== 'program') return
+    const el = canvasRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      setZoom(prev => {
+        const next = Math.min(1.5, Math.max(0.4, prev + (e.deltaY > 0 ? -0.1 : 0.1)))
+        zoomRef.current = next
+        return next
+      })
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || !pinchRef.current) return
+      e.preventDefault()
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY,
+      )
+      const next = Math.min(1.5, Math.max(0.4, pinchRef.current.startZoom * (dist / pinchRef.current.dist)))
+      zoomRef.current = next
+      setZoom(next)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('touchmove', onTouchMove)
+    }
+  }, [workspaceTab])
+
   const sharedListProps = {
     depth: 0,
     activeIndex: currentBlockIndex,
@@ -733,6 +806,7 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
     onToggleWrap: handleToggleWrap,
     selectMode,
     dragCtx,
+    onEnterSelectMode: handleEnterSelectMode,
   }
 
   return (
@@ -823,6 +897,24 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
           className="absolute inset-0 z-30 bg-black/20 rounded-xl"
           onClick={() => { setShowPalette(false); setPaletteView('categories') }}
         />
+      )}
+
+      {/* ── Zoom controls (bottom-left) ───────────────────────────── */}
+      {workspaceTab === 'program' && (
+        <div className="absolute bottom-3 left-3 z-50 flex items-center gap-0.5 bg-white/90 backdrop-blur-sm rounded-full shadow-md border border-slate-200 px-1 py-1">
+          <button
+            onClick={() => updateZoom(Math.max(0.4, Math.round((zoom - 0.1) * 10) / 10))}
+            className="w-7 h-7 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-100 font-bold text-base leading-none touch-manipulation"
+          >−</button>
+          <button
+            onClick={() => updateZoom(1.0)}
+            className="text-[10px] text-slate-500 px-1 min-w-[2.5rem] text-center tabular-nums touch-manipulation"
+          >{Math.round(zoom * 100)}%</button>
+          <button
+            onClick={() => updateZoom(Math.min(1.5, Math.round((zoom + 0.1) * 10) / 10))}
+            className="w-7 h-7 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-100 font-bold text-base leading-none touch-manipulation"
+          >+</button>
+        </div>
       )}
 
       {/* ── Floating palette toggle button (bottom-right) ─────────── */}
@@ -985,12 +1077,26 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
         {/* Canvas (program tab) */}
         {workspaceTab === 'program' && (
           <div
+            ref={canvasRef}
             className="flex-1 overflow-y-auto p-4"
             style={{
               backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(15,23,42,0.04) 1px, transparent 0)',
               backgroundSize: '20px 20px',
             }}
             onClick={() => { setSelectedContainerId(null); if (!selectMode) setWrapSelectIds(new Set()) }}
+            onTouchStart={(e) => {
+              if (e.touches.length === 2) {
+                pinchRef.current = {
+                  dist: Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY,
+                  ),
+                  startZoom: zoomRef.current,
+                }
+              } else {
+                pinchRef.current = null
+              }
+            }}
           >
             {blocks.length === 0 ? (
               <div
@@ -1019,6 +1125,7 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
                 </p>
               </div>
             ) : (
+              <div style={{ zoom: zoom }}>
               <div className="max-w-md mx-auto pt-1" onClick={(e) => e.stopPropagation()}>
                 <BlockList
                   list={blocks}
@@ -1042,6 +1149,7 @@ export function ScratchView({ testingContent }: { testingContent?: ReactNode }) 
                     </motion.div>
                   )}
                 </AnimatePresence>
+              </div>
               </div>
             )}
           </div>
